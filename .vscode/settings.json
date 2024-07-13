@@ -1,0 +1,12 @@
+{
+    "search.useIgnoreFiles": false,
+    "editor.tabSize": 2,
+    "eslint.experimental.useFlatConfig": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit"
+    },
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+    "eslint.format.enable": true,
+    "eslint.validate": ["javascript", "typescript"],
+    "typescript.tsdk": "node_modules/typescript/lib",
+}
