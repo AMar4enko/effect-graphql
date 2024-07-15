@@ -1,11 +1,11 @@
 import { AST, Schema } from '@effect/schema'
-import { Array as A, Effect, FiberRef, Match, Option, Record as R, Runtime } from 'effect'
-import { GraphQLInputFieldConfig, GraphQLInputObjectType, GraphQLInputType, GraphQLList, GraphQLNonNull, GraphQLType } from 'graphql/type'
+import { Array as A, Effect, Fiber, FiberRef, Match, Option, Record as R, Scope } from 'effect'
+import { astFromValue, GraphQLInputFieldConfig, GraphQLInputObjectType, GraphQLInputType, GraphQLList, GraphQLNonNull, GraphQLScalarType } from 'graphql'
 
 import { DeprecationReason } from '../annotation'
 
-import { compileEnum, compileScalar, GqlBuilderCacheRef } from './misc'
-import { GqlSchemaRegistrar } from '../types'
+import { cache, compileEnum, compileScalar, getSchemaCache } from './misc'
+import { IdentifierAnnotationId } from '@effect/schema/AST'
 
 const compileTuple = (ast: AST.TupleType) =>
   A.head(ast.elements).pipe(
@@ -14,14 +14,24 @@ const compileTuple = (ast: AST.TupleType) =>
     Effect.catchAll(() => Effect.fail(new Error(`Cannot compile input tuple type ${ast}`))),
   )
 
-const compileTupleEnum = Match.type<AST.AST>().pipe(
+const compileUnionTupleEnum = Match.type<AST.AST>().pipe(
   Match.tag(`TupleType`, ast => compileTuple(ast)),
   Match.tag(`Enums`, ast => compileEnum(ast)),
+  Match.tag(`Union`, ast => {
+    if (ast.types.length === 2 && ast.types.includes(AST.undefinedKeyword)) {
+      return compileInputType(ast.types.filter((ast) => ast !== AST.undefinedKeyword)[0])
+    }
+    return Effect.fail(new Error(`Unions are not supported ${ast}`))
+  })
 )
 
 const compileTypeLiteral = Match.type<AST.AST>().pipe(
   Match.tag(`TypeLiteral`, ast => Effect.gen(function* () {
-    const name = yield* AST.getIdentifierAnnotation(ast).pipe(Effect.orElse(() => Effect.fail(new Error(`TypeLiteral must have identifier annotation`))))
+    const cache = yield* getSchemaCache
+    const name = yield* AST.getIdentifierAnnotation(ast)
+      .pipe(
+        Effect.orElse(() => Effect.fail(new Error(`TypeLiteral must have identifier annotation`)))
+      )
 
     const compileFields = Effect.suspend(() => {
       const defs = ast.propertySignatures.map((prop) => {
@@ -44,29 +54,29 @@ const compileTypeLiteral = Match.type<AST.AST>().pipe(
 
     const fields = yield* compileFields
 
-    return new GraphQLInputObjectType({
+    const input = new GraphQLInputObjectType({
       fields,
       name,
       description: AST.getDescriptionAnnotation(ast).pipe(Option.getOrUndefined),
     })
-  })),
+    return input
+  }).pipe(cache(ast))),
 )
 
-export const compileInputType = (ast: AST.AST): Effect.Effect<GraphQLInputType, Error, GqlSchemaRegistrar> => Effect.gen(function* () {
-  const builderCache = yield* GqlSchemaRegistrar
-
-  const compiler = compileTypeLiteral.pipe(
-    Match.orElse(ast => Effect.fail(new Error(`Could not compile input type for ${ast}`))),
+export const compileInputType = (ast: AST.AST): Effect.Effect<GraphQLInputType, Error> => Effect.gen(function* () {
+  const compiler = compileScalar.pipe(
+    Match.orElse(
+      compileUnionTupleEnum.pipe(
+        Match.orElse( 
+          compileTypeLiteral.pipe(
+            Match.orElse(ast => Effect.fail(new Error(`Could not compile input type for ${ast}`)))
+          )
+        )
+      )        
+    )
   )
 
-  return yield* Effect.orElse(
-    Effect.fromNullable(
-      builderCache.inputs.get(ast),
-    ),
-    () => compiler(ast).pipe(
-      Effect.tap((a) => Effect.sync(() => builderCache.inputs.set(ast, a)))
-    ),
-  )
+  return yield* compiler(ast).pipe(cache(ast))
 })
 
 const compileInputProperty = Match.type<AST.AST | Schema.PropertySignature.AST>().pipe(
@@ -90,7 +100,6 @@ const compileInputProperty = Match.type<AST.AST | Schema.PropertySignature.AST>(
   Match.tag(`PropertySignatureTransformation`, () => Effect.fail(new Error(`Cannot compile transformation property signature`))),
   Match.orElse((ast) => {
     const defaultValue = AST.getDefaultAnnotation(ast).pipe(Option.getOrUndefined)
-
     return compileInputType(ast).pipe(
       Effect.map(type => ({
         type: new GraphQLNonNull(type),
@@ -103,5 +112,11 @@ const compileInputProperty = Match.type<AST.AST | Schema.PropertySignature.AST>(
 )
 
 export const compileInputFields = (fields: Schema.Struct.Fields) => Effect.gen(function* () {
-  return yield* Effect.all(R.mapEntries(fields, (signature, key) => [key, compileInputProperty(signature.ast)]))
+  const withoutTag = R.filter(fields, (_, key) => key !== `_tag`)
+
+  return yield* Effect.all(
+    R.mapEntries(withoutTag, (signature, key) => {
+      return [key, compileInputProperty(signature.ast)]
+    })
+  )
 })

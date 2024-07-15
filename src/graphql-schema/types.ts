@@ -2,7 +2,7 @@ import { GenericTag, Tag } from 'effect/Context'
 import { AST, Schema } from '@effect/schema'
 import { TaggedRequest } from '@effect/schema/Schema'
 import { Effect, Request, RequestResolver } from 'effect'
-import { GraphQLScalarType, GraphQLInterfaceType, GraphQLObjectType, GraphQLInputObjectType, ThunkObjMap, GraphQLFieldConfig } from 'graphql'
+import { GraphQLScalarType, GraphQLInterfaceType, GraphQLObjectType, GraphQLInputObjectType, ThunkObjMap, GraphQLFieldConfig, GraphQLEnumType, GraphQLInputType, GraphQLType } from 'graphql'
 
 export type AnyClass = Schema.Class<any, any, any, any, any, any, any>
 
@@ -33,11 +33,11 @@ export interface TaggedRequestNewable<R extends TaggedRequest.Any> {
 }
 
 export interface GqlSchema<
-  Type extends Map<any, { [key in string]: TaggedRequestNewable<any> }>,
-  Query extends Record<string, TaggedRequestNewable<any>>,
-  Mutation extends Record<string, TaggedRequestNewable<any>>,
-  Subscription extends Record<string, TaggedRequestNewable<any>>,
-  RequestResolver extends Record<string, RequestResolver.RequestResolver<TaggedRequestNewable<any>, any>>,
+  Type extends Map<any, { [key in string]: TaggedRequestNewable<any> }> = Map<any, { [key in string]: TaggedRequestNewable<any> }>,
+  Query extends Record<string, TaggedRequestNewable<any>> = Record<never, TaggedRequestNewable<any>>,
+  Mutation extends Record<string, TaggedRequestNewable<any>> = Record<never, TaggedRequestNewable<any>>,
+  Subscription extends Record<string, TaggedRequestNewable<any>> = Record<never, TaggedRequestNewable<any>>,
+  RequestResolver extends Map<TaggedRequestNewable<any>, RequestResolver.RequestResolver<TaggedRequestNewable<any>, any>> = Map<TaggedRequestNewable<any>, RequestResolver.RequestResolver<TaggedRequestNewable<any>, any>>,
   CtxTag extends Tag<any, any> | undefined = undefined,
 > {
   type: Type
@@ -48,15 +48,12 @@ export interface GqlSchema<
   ctxTag?: CtxTag
 }
 
-export type ResolverType<S extends GqlSchema.Empty, Op extends 'query' | 'mutation', T extends S[Op extends keyof S ? Op : never]> =
+export const GqlSchema = GenericTag<GqlSchema>(`effect-graphql/source-schema`)
+
+export type ResolverType<S extends GqlSchema, Op extends 'query' | 'mutation', T extends S[Op extends keyof S ? Op : never]> =
   S[Op][T extends keyof S[Op] ? T : never] extends TaggedRequestNewable<infer R>
     ? (r: R) => Effect.Effect<Request.Request.Success<R>, Request.Request.Error<R>>
     : never
-
-// eslint-disable-next-line @typescript-eslint/no-namespace
-export declare namespace GqlSchema {
-  export type Empty = GqlSchema<Map<any, {}>, {}, {}, {}, {}, never>
-}
 
 /**
  * For Input types, unlike with Schema decode, we're not gonna
@@ -75,11 +72,8 @@ export type UnwrapClasses<S> = S extends Schema.Schema.Any
           ? { [K in Keys]: UnwrapClasses<S[K]> }
           : S
 
-export interface GqlSchemaRegistrar {
-  scalars: Map<AST.AST, GraphQLScalarType>
-  interfaces: Map<AST.AST, GraphQLInterfaceType>
-  objects: Map<AST.AST, GraphQLObjectType>
-  inputs: Map<AST.AST, GraphQLInputObjectType>
+export interface GqlSchemaCache {
+  ast: WeakMap<AST.AST, any>
+  id: Map<string, any>
+  idx: number
 }
-
-export const GqlSchemaRegistrar = GenericTag<GqlSchemaRegistrar>(`effect-graphql/schema-registrar`)

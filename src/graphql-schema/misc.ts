@@ -1,10 +1,13 @@
 import { dual } from 'effect/Function'
 import { AST, Schema } from '@effect/schema'
-import { Declaration, Element, IndexSignature, isTypeLiteralTransformation, partial as _partial, PropertySignature, PropertySignatureTransformation, Suspend, Transformation, TupleType, TypeLiteral, undefinedKeyword, Union } from '@effect/schema/AST'
+import { Declaration, IndexSignature, PropertySignature as _PropertySignature, partial as _partial, PropertySignatureTransformation, Suspend, Transformation, TupleType, TypeLiteral, undefinedKeyword, Union, OptionalType } from '@effect/schema/AST'
 import { isSchema, make } from '@effect/schema/Schema'
-import { Array as Arr, identity, Option } from 'effect'
+import { identity, Option } from 'effect'
+import { createHash } from 'node:crypto'
 
-import { GqlSchema } from './types'
+import { AnyClass, GqlSchema } from './types'
+import { getInterfaceFields } from './interface'
+import { Reference } from './annotation'
 
 export const exposeKey = (a: any, key: string) => a[key]
 
@@ -28,32 +31,46 @@ export type DeepPartial<A, Options extends { readonly exact: true } | undefined>
       ? { [K in keyof A]?: DeepPartial<A[K], Options> | ([undefined] extends [Options] ? undefined : never) }
       : never
 
-type DeepPartialSchema<S, Options extends { readonly exact: true } | undefined> = S extends Schema.Schema<infer A, infer I, infer R> ?
-  Schema.Schema<
-    DeepPartial<A, Options>,
-    DeepPartial<I, Options>,
-    R
-  > :
-  S
+type DeepPartialSchema<S, Options extends { readonly exact: true } | undefined> = S extends Schema.Schema<infer A, infer I, infer R>
+  ? Schema.Schema<
+      DeepPartial<A, Options>,
+      DeepPartial<I, Options>,
+      R
+    >
+  : S extends Schema.optional<Schema.Schema<infer A, infer I, infer R>>
+    ? Schema.optional<Schema.Schema<
+        DeepPartial<A, Options>,
+        DeepPartial<I, Options>,
+        R
+      >>
+    : S
+
+const astReference = (ast: AST.AST) => {
+  const hash = createHash(`sha256`, ) 
+
+  hash.update(JSON.stringify(ast))
+
+  return hash.digest().toString(`hex`)
+}
+
 
 const deepPartialAst = (ast: AST.AST, options?: { readonly exact: true }): AST.AST => {
-  const exact = options?.exact === true
+  const exact = true
   switch (ast._tag) {
     case `TupleType`:
       return new TupleType(
-        ast.elements.map(e => new Element(exact ? deepPartialAst(e.type) : orUndefined(e.type), true)),
-        Arr.match(ast.rest, {
-          onEmpty: () => ast.rest,
-          onNonEmpty: rest => [Union.make([...rest, undefinedKeyword])],
-        }),
+        ast.elements.map(e => new OptionalType(exact ? deepPartialAst(e.type) : orUndefined(e.type), true)),
+        ast.rest.map(e => new OptionalType(exact ? deepPartialAst(e.type) : orUndefined(e.type), true)),
         ast.isReadonly,
+        ast.annotations
       )
     case `TypeLiteral`:
       return new TypeLiteral(
         ast.propertySignatures.map(ps =>
-          new PropertySignature(ps.name, exact ? deepPartialAst(ps.type) : orUndefined(deepPartialAst(ps.type)), true, ps.isReadonly, ps.annotations),
+          new _PropertySignature(ps.name, exact ? deepPartialAst(ps.type) : orUndefined(deepPartialAst(ps.type)), true, ps.isReadonly, ps.annotations),
         ),
         ast.indexSignatures.map(is => new IndexSignature(is.parameter, orUndefined(is.type), is.isReadonly)),
+        { ...ast.annotations, [Reference]: astReference(ast) }
       )
     case `Union`:
       return Union.make(ast.types.map(member => deepPartialAst(member, options)))
@@ -68,27 +85,14 @@ const deepPartialAst = (ast: AST.AST, options?: { readonly exact: true }): AST.A
     case `Refinement`:
       return ast
     case `Transformation`: {
-      // if (
-      //   isTypeLiteralTransformation(ast.transformation)
-      // ) {
       const to = AST.getAnnotation(ast.to, SurrogateAnnotationId).pipe(Option.getOrElse(() => ast.to)) as unknown as AST.AST
 
       return new Transformation(
         deepPartialAst(ast.from, options),
         deepPartialAst(to, options),
         ast.transformation,
+        { ...ast.annotations, [Reference]: astReference(ast) }
       )
-      // const transformTo = AST.getAnnotation(ast.to, SurrogateAnnotationId).pipe(Option.getOrElse(() => ast.to)) as unknown as AST.AST
-      // console.log(ast, transformTo)
-      // return deepPartialAst(transformTo, options)
-      // return new Transformation(
-      //   deepPartialAst(ast.from, options),
-      //   deepPartialAst(transformTo, options),
-      //   ast.transformation,
-      // )
-      // }
-
-      // return ast
     }
   }
   return ast
@@ -109,10 +113,10 @@ export const deepPartial: {
   options?: { readonly exact: true },
 ): DeepPartialSchema<typeof self, typeof options> => make(deepPartialAst(self.ast, options)))
 
-export const empty = (): GqlSchema.Empty => ({
+export const empty = (): GqlSchema => ({
   mutation: {},
   type: new Map(),
   query: {},
   subscription: {},
-  resolver: {},
+  resolver: new Map(),
 })
