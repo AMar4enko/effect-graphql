@@ -1,5 +1,5 @@
-import { AST, Schema } from '@effect/schema'
-import { Effect, Logger, LogLevel, pipe, RequestResolver } from 'effect'
+import { Schema } from '@effect/schema'
+import { Effect, Logger, LogLevel, pipe } from 'effect'
 import { expect } from 'vitest'
 
 import * as Gql from '../../src/graphql-schema'
@@ -9,7 +9,7 @@ import { it } from '@effect/vitest'
 import { TaggedRequest } from '@effect/schema/Schema'
 
 
-it.effect(`input compilation`, () => Effect.gen(function* () {
+it.effect(`schema compilation`, () => Effect.gen(function* () {
   const Identifiable = Schema.Struct({
     id: Schema.Number,
   }).pipe(
