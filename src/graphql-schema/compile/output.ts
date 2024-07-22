@@ -127,14 +127,15 @@ const compileFields = (ast: AST.AST, props: PropertySignature[]) => Effect.gen(f
             const { tag, fields } = yield* AST.getAnnotation<RequestMetadata>(ast, RequestMetadata).pipe(
               Effect.mapError(() => new Error(`GraphQL operation requests must be created using Operation class`)),
             )
-            const res = yield* Effect.fromNullable(source.resolver[tag]).pipe(
+
+            const resolver = yield* Effect.fromNullable(source.resolver).pipe(
               Effect.catchAll(() => Effect.fail(new Error(`Could not find resolver for ${tag}`))),
-              Effect.flatMap(r => RequestResolver.contextFromEffect(r as RequestResolver.RequestResolver<any, never>)),
+              Effect.flatMap(r => RequestResolver.contextFromEffect(r)),
             )
 
             const args = R.isEmptyRecord(fields) ? undefined : yield* compileInputFields(fields)
 
-            fieldConfig.resolve = yield* makeResolver(requests[value.name as string], res)
+            fieldConfig.resolve = yield* makeResolver(requests[value.name as string], resolver)
             fieldConfig.args = args
           }
 

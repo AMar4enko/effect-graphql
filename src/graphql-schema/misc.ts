@@ -2,7 +2,7 @@ import { dual } from 'effect/Function'
 import { AST, Schema } from '@effect/schema'
 import { Declaration, IndexSignature, PropertySignature as _PropertySignature, partial as _partial, PropertySignatureTransformation, Suspend, Transformation, TupleType, TypeLiteral, undefinedKeyword, Union, OptionalType } from '@effect/schema/AST'
 import { isSchema, make } from '@effect/schema/Schema'
-import { identity, Option } from 'effect'
+import { identity, Option, RequestResolver } from 'effect'
 import { createHash } from 'node:crypto'
 
 import { AnyClass, GqlSchema } from './types'
@@ -118,5 +118,5 @@ export const empty = (): GqlSchema => ({
   type: new Map(),
   query: {},
   subscription: {},
-  resolver: new Map(),
+  resolver: undefined,
 })

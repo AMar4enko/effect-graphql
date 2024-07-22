@@ -37,14 +37,14 @@ export interface GqlSchema<
   Query extends Record<string, TaggedRequestNewable<any>> = Record<never, TaggedRequestNewable<any>>,
   Mutation extends Record<string, TaggedRequestNewable<any>> = Record<never, TaggedRequestNewable<any>>,
   Subscription extends Record<string, TaggedRequestNewable<any>> = Record<never, TaggedRequestNewable<any>>,
-  RequestResolver extends Map<TaggedRequestNewable<any>, RequestResolver.RequestResolver<TaggedRequestNewable<any>, any>> = Map<TaggedRequestNewable<any>, RequestResolver.RequestResolver<TaggedRequestNewable<any>, any>>,
-  CtxTag extends Tag<any, any> | undefined = undefined,
+  RequestResolver extends RequestResolver.RequestResolver<any> = RequestResolver.RequestResolver<any>,
+  CtxTag extends Tag<any, any> = Tag<any, any>,
 > {
   type: Type
   query: Query
   mutation: Mutation
   subscription: Subscription
-  resolver: RequestResolver
+  resolver?: RequestResolver
   ctxTag?: CtxTag
 }
 
