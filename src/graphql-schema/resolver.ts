@@ -41,7 +41,7 @@ export const resolveOperation = <
 >(req: Request, res: Resolver) => (s: S) => {
   return {
     ...s,
-    resolver: new Map(s.resolver.set(req, res as any))
+    resolver: new Map(    )
   } satisfies GqlSchema
 }
 

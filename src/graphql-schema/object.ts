@@ -37,8 +37,8 @@ export const extendsInterface = <
 >(i: Struct) =>
     (Class: Self): ExtendClass<Self, Struct> => {
       Option.getOrThrowWith(
-        AST.getAnnotation(i.ast, GqlInterfaceName),
-        () => `Schema ${i} must be annotated with asInterface annotation`,
+        AST.getIdentifierAnnotation(i.ast),
+        () => `Schema ${i} must have identifier annotation`,
       )
 
       if (Class.ast._tag !== `Transformation`) {

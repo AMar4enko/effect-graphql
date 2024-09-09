@@ -4,7 +4,6 @@ import { Declaration, IndexSignature, PropertySignature as _PropertySignature, p
 import { isSchema, make } from '@effect/schema/Schema'
 import { identity, Option } from 'effect'
 import { createHash } from 'node:crypto'
-import { GqlSchema } from './types'
 import { Reference } from './annotation'
 
 export const exposeKey = (a: any, key: string) => a[key]
@@ -74,6 +73,7 @@ const deepPartialAst = (ast: AST.AST, options?: { readonly exact: true }): AST.A
         ast.typeParameters.map(ast => deepPartialAst(ast, options)),
         ast.decodeUnknown,
         ast.encodeUnknown,
+        { ...ast.annotations, [Reference]: astReference(ast) }
       )
     case `Refinement`:
       return ast
@@ -82,7 +82,7 @@ const deepPartialAst = (ast: AST.AST, options?: { readonly exact: true }): AST.A
 
       return new Transformation(
         deepPartialAst(ast.from, options),
-        deepPartialAst(to, options),
+        deepPartialAst(ast.to, options),
         ast.transformation,
         { ...ast.annotations, [Reference]: astReference(ast) }
       )
@@ -105,11 +105,3 @@ export const deepPartial: {
   self: Schema.Schema<A, I, R>,
   options?: { readonly exact: true },
 ): DeepPartialSchema<typeof self, typeof options> => make(deepPartialAst(self.ast, options)))
-
-export const empty = (): GqlSchema => ({
-  mutation: {},
-  type: new Map(),
-  query: {},
-  subscription: {},
-  resolver: undefined,
-})

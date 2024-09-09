@@ -3,26 +3,30 @@
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
+    "@effect/vitest": "^0.6.7",
     "@stylistic/eslint-plugin": "^1.5.3",
     "@total-typescript/ts-reset": "^0.5.1",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
-    "@effect/vitest": "^0.6.7",
+    "bun-types": "latest",
     "eslint": "^8.56.0",
     "eslint-plugin-check-file": "^2.5.0",
+    "eslint-plugin-disable-autofix": "^4.2.0",
+    "eslint-plugin-expect-type": "^0.3.0",
     "eslint-plugin-simple-import-sort": "^10.0.0",
     "eslint-plugin-storybook": "^0.6.15",
     "eslint-plugin-unused-imports": "^3.0.0",
     "eslint-plugin-vue": "^9.20.1",
-    "eslint-plugin-disable-autofix": "^4.2.0",
-    "eslint-plugin-expect-type": "^0.3.0",
-    "bun-types": "latest",
-    "vitest": "^1.4.0",
-    "typescript": "~5.5.3"
+    "expect-type": "^0.20.0",
+    "tsx": "^4.19.0",
+    "typescript": "~5.5.3",
+    "vitest": "^1.4.0"
   },
   "dependencies": {
-    "@effect/schema": "^0.68.26",
-    "effect": "^3.5.6",
+    "@effect/platform": "^0.64.0",
+    "@effect/platform-node": "^0.59.0",
+    "@effect/schema": "^0.72.3",
+    "effect": "^3.6.5",
     "graphql": "^16.8.1",
     "graphql-yoga": "^5.3.0"
   }

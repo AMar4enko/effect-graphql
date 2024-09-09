@@ -15,6 +15,7 @@
     "jsx": "react-jsx",
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
+    "exactOptionalPropertyTypes": true,
     "allowJs": true,
     "types": [
       "@total-typescript/ts-reset",

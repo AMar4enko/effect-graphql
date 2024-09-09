@@ -2,7 +2,7 @@ import { GenericTag, Tag } from 'effect/Context'
 import { AST, Schema } from '@effect/schema'
 import { TaggedRequest } from '@effect/schema/Schema'
 import { Effect, Request, RequestResolver } from 'effect'
-import { GraphQLScalarType, GraphQLInterfaceType, GraphQLObjectType, GraphQLInputObjectType, ThunkObjMap, GraphQLFieldConfig, GraphQLEnumType, GraphQLInputType, GraphQLType } from 'graphql'
+import { FieldResolver, SchemaWithFields } from '../graphql-schema-next/schema'
 
 export type AnyClass = Schema.Class<any, any, any, any, any, any, any>
 
@@ -32,10 +32,15 @@ export interface TaggedRequestNewable<R extends TaggedRequest.Any> {
   fields: Schema.Struct.Fields
 }
 
+export type SchemaFieldResolvers<S extends SchemaWithFields> = 
+  S extends SchemaWithFields<infer F>
+    ? { [key in F]: FieldResolver<F, S, TaggedRequestNewable<any>, key> }
+    : never
+
 export interface GqlSchema<
-  Type extends Map<any, { [key in string]: TaggedRequestNewable<any> }> = Map<any, { [key in string]: TaggedRequestNewable<any> }>,
-  Query extends Record<string, TaggedRequestNewable<any>> = Record<never, TaggedRequestNewable<any>>,
-  Mutation extends Record<string, TaggedRequestNewable<any>> = Record<never, TaggedRequestNewable<any>>,
+  Type extends Map<string, { [key in string]: TaggedRequestNewable<any> }> = Map<string, { [key in string]: TaggedRequestNewable<any> }>,
+  Query extends Map<string, { [key in string]: TaggedRequestNewable<any> }> = Map<string, { [key in string]: TaggedRequestNewable<any> }>,
+  Mutation extends Map<string, { [key in string]: TaggedRequestNewable<any> }> = Map<string, { [key in string]: TaggedRequestNewable<any> }>,
   Subscription extends Record<string, TaggedRequestNewable<any>> = Record<never, TaggedRequestNewable<any>>,
   RequestResolver extends RequestResolver.RequestResolver<any> = RequestResolver.RequestResolver<any>,
   CtxTag extends Tag<any, any> = Tag<any, any>,

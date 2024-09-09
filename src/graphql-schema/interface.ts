@@ -6,27 +6,6 @@ import { FieldResolvers, GqlInterface, GqlInterfaceName } from './annotation'
 import { exposeKey } from './misc'
 import { AnyClass } from './types'
 
-/**
- * Annotates struct schema with as GraphQL interface
- * It's required for later extendsInterface usage
- *
- * @example
- *
- * const Identifiable = Schema.struct({
- *   name: Schema.string
- * }).pipe(
- *  asInterface(`Identifiable`),
- * )
- */
-export const asInterface: {
-  <A extends Schema.Struct<any>, Tag extends string>(schema: A, name: Tag): A
-  <A extends Schema.Struct<any>, Tag extends string>(name: Tag): (schema: A) => A
-} = dual(
-  2,
-  (self: Schema.Schema.Any, that: string) =>
-    Schema.annotations(self, { [GqlInterfaceName]: that, [AST.IdentifierAnnotationId]: that }),
-)
-
 export const getInterfaces: (a: AST.AST) => AST.AST[] = (ast: AST.AST): AST.AST[] => {
   return pipe(
     AST.getAnnotation<AST.AST[]>(ast._tag === `Transformation` ? ast.to : ast, GqlInterface),
