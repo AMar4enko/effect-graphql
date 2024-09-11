@@ -1,24 +1,27 @@
 import { AST, Schema } from '@effect/schema'
 import { PropertySignature } from '@effect/schema/AST'
-import { Array as A, Effect, FiberRef, Match, Option, Record as R, RequestResolver, Runtime, Array, Console, Record } from 'effect'
+import { Array as A, Effect, FiberRef, Match, Option, Record as R, Runtime, Array, Record } from 'effect'
 import { GraphQLFieldConfig, GraphQLInterfaceType, GraphQLList, GraphQLNonNull, GraphQLObjectType, GraphQLOutputType, GraphQLType, GraphQLUnionType } from 'graphql/type'
 
-import { DeprecationReason, GqlInterface, SurrogateAnnotationId } from '../annotation'
+import { DeprecationReason, SurrogateAnnotationId } from '../annotation'
 import * as Ctx from './context'
 
 import { compileInputFields } from './input'
 import { cache, compileEnum, compileScalar, makeResolver, omitTag } from './misc'
 import { getInterfaces } from '../interface'
 import * as GraphQL from '../schema'
+import { getIdentifierAnnotation } from '../misc'
+import { GqlInterfaceTypeId, GqlTypeTypeId } from '../entity'
 
 const isProp = FiberRef.unsafeMake(false)
 
-const compileTuple = (ast: AST.TupleType) =>
-  A.head(ast.rest).pipe(
+const compileTuple = (ast: AST.TupleType) => {
+  return A.head(ast.rest).pipe(
     Effect.flatMap(el => compileOutputType(el.type)),
     Effect.map(inputType => new GraphQLList(inputType)),
     Effect.catchAll((e) => Effect.fail(new Error(`Cannot compile input tuple type ${ast}: ${e}`))),
   )
+}
 
 const nonNullable = <A extends GraphQLType>(type: A) => 
   type instanceof GraphQLNonNull
@@ -113,7 +116,7 @@ const compileOutputProperty = Match.type<AST.AST | Schema.PropertySignature.AST>
 const compileFields = (ast: AST.AST, props: PropertySignature[]) => Effect.gen(function* () {
   const source = yield* Ctx.Schema
 
-  const identifier = AST.getIdentifierAnnotation(ast).pipe(Option.getOrNull)
+  const identifier = getIdentifierAnnotation(ast).pipe(Option.getOrNull)
 
   return yield* Effect.all(
     R.fromEntries(
@@ -129,7 +132,7 @@ const compileFields = (ast: AST.AST, props: PropertySignature[]) => Effect.gen(f
               Effect.andThen((RequestNewable: GraphQL.TaggedRequestNewable<Schema.TaggedRequest.Any>) => 
                 Effect.all({
                   resolve: makeResolver(RequestNewable, source.definition.resolver),
-                  args: R.isEmptyRecord(RequestNewable.fields) ? Effect.void : compileInputFields(RequestNewable.fields)
+                  args: R.isEmptyRecord(RequestNewable.fields) ? Effect.void : compileInputFields(R.filter(RequestNewable.fields, (_, key) => key !== `parent`))
                 })
               ),
               Effect.tap((a) => {
@@ -146,9 +149,6 @@ const compileFields = (ast: AST.AST, props: PropertySignature[]) => Effect.gen(f
   )
 })
 
-/**
- * Type literals are supposed to be compiled into GraphQL interface
- */
 const compileTypeLiteral = Match.type<AST.AST>().pipe(
   Match.tag(`TypeLiteral`, ast => Effect.gen(function* () {
     const runSync = Runtime.runSync(yield* Effect.runtime<GraphQL.Schema<GraphQL.Schema.AnyDefinition>>())
@@ -167,40 +167,60 @@ const compileTypeLiteral = Match.type<AST.AST>().pipe(
   }).pipe(cache(ast))),
 )
 
-/**
- * Objects are Transforms from TypeLiteral into Surrogate Declaration
- */
 const compileTransformation = Match.type<AST.AST>().pipe(
   Match.tag(`Transformation`, ast => Effect.gen(function* () {
     const runSync = Runtime.runSync(yield* Effect.runtime<GraphQL.Schema<GraphQL.Schema.AnyDefinition>>())
 
-    const name = yield* 
-      AST.getIdentifierAnnotation(ast.to).pipe(
-        Effect.orElse(() => Effect.fail(new Error(`Transformation ${ast} must have identifier annotation`))),
-      )
+    const isType = AST.getAnnotation(ast.to, GqlTypeTypeId).pipe(Option.isSome)
+    const isInterface = AST.getAnnotation(ast.to, GqlInterfaceTypeId).pipe(Option.isSome)
+
+    if (!isType && !isInterface) {
+      return yield* Effect.fail(new Error(`Transformation expected to be either GqlType or GqlInterface`))
+    }
+
+    const name = yield* AST.getIdentifierAnnotation(ast.to).pipe(
+      Effect.orElse(() => Effect.fail(new Error(`Transformation ${ast} must have identifier annotation`))),
+    )
 
     const surrogate = yield* AST.getAnnotation<AST.TypeLiteral>(ast, SurrogateAnnotationId).pipe(
       Effect.orElse(() => Effect.fail(new Error(`Only TaggedClass Transforms are supported`))),
     )
 
-    AST.getAnnotation(ast, GqlInterface).pipe(
-      Option.getOrElse(() => []),
+
+    const extendsInterfaces = getInterfaces(ast)
+
+    const interfaces = () => {
+      return Effect.all(extendsInterfaces.map(compileOutputType)).pipe(
+        Effect.map((types) => types.filter((t) => t instanceof GraphQLInterfaceType)),
+        runSync
+      )
+    }
+
+    const fieldsToBeCompiled = omitTag([...surrogate.propertySignatures])
+
+    const compileFieldsEffect = FiberRef.set(isProp, true).pipe(
+      Effect.zipRight(compileFields(ast, omitTag([...fieldsToBeCompiled])))
     )
 
-    const fields = FiberRef.set(isProp, true).pipe(
-      Effect.zipRight(compileFields(ast, omitTag([...surrogate.propertySignatures])))
-    )
+    const fields = () => runSync(compileFieldsEffect)
+    const description = AST.getDescriptionAnnotation(ast).pipe(Option.getOrUndefined)
+
+
+    if (isInterface) {
+      return new GraphQLInterfaceType({
+        fields,
+        interfaces,
+        resolveType: (obj) => obj._tag,
+        name,
+        description,
+      })
+    }
 
     return new GraphQLObjectType({
-      fields: () => runSync(fields),
-      interfaces: () => {
-        return Effect.all(getInterfaces(ast).map(compileOutputType)).pipe(
-          Effect.map((types) => types.filter((t) => t instanceof GraphQLInterfaceType)),
-          runSync
-        )
-      },
+      fields,
+      interfaces,
       name,
-      description: AST.getDescriptionAnnotation(ast).pipe(Option.getOrUndefined),
+      description,
     })
   }).pipe(cache(ast))),
 )
@@ -221,13 +241,9 @@ export const compileOutputType = (ast: AST.AST): Effect.Effect<GraphQLOutputType
         Match.orElse(
           compileTupleEnum.pipe(
             Match.orElse(
-              compileTypeLiteral.pipe(
-                Match.orElse(
-                  compileTransformation.pipe(
-                    Match.orElse(ast => Effect.fail(new Error(`Could not compile input type for ${ast}`)))
-                  )
-                ),
-              ),
+              compileTransformation.pipe(
+                Match.orElse(ast => Effect.fail(new Error(`Could not compile output type for ${ast}`)))
+              )
             ),
           ),
         ),

@@ -2,12 +2,12 @@ import { pipe } from 'effect/Function'
 import { AST } from '@effect/schema'
 import { Option } from 'effect'
 
-import { GqlInterface } from './annotation'
+import { ExtendsInterface } from './annotation'
 
-export const getInterfaces: (a: AST.AST) => AST.AST[] = (ast: AST.AST): AST.AST[] => {
+export const getInterfaces: (a: AST.AST) => AST.AST[] = (ast: AST.AST): AST.Transformation[] => {
   return pipe(
-    AST.getAnnotation<AST.AST[]>(ast._tag === `Transformation` ? ast.to : ast, GqlInterface),
-    Option.getOrElse(() => []),
+    AST.getAnnotation<AST.Transformation[]>(ast._tag === `Transformation` ? ast.to : ast, ExtendsInterface),
+    Option.getOrElse(() => [] as AST.Transformation[]),
   )
 }
 

@@ -7,20 +7,23 @@ import { printSchema } from 'graphql'
 import { it } from '@effect/vitest'
 import { Operation } from '../operation.js'
 import * as Ctx from '../compile/context.js'
+import { GqlInterface, GqlType } from '../entity.js'
 
 
 it.effect(`schema compilation`, () => Effect.gen(function* () {
-  // const Identifiable = Schema.Struct({
-  //   id: Schema.Number,
-  // }).pipe(
-  //   Gql.Interface.asInterface(`Identifiable`)
-  // )
+  class Commentable extends GqlInterface<Commentable>()(
+    `Commentable`,
+    {
+      comments: Schema.optional(Schema.Array(Schema.String))
+    },
+  ){}
 
-  class User extends Schema.TaggedClass<User>()(
+  class User extends GqlType<User>()(
     `User`,
     {
       name: Schema.String,
     },
+    [Commentable]
   ) {}
 
   // class Post extends Schema.TaggedClass<Post>()(
@@ -80,6 +83,8 @@ it.effect(`schema compilation`, () => Effect.gen(function* () {
     Logger.withMinimumLogLevel(LogLevel.All),
     Effect.map(printSchema)
   )
+
+  console.log(schema)
 
 //   expect(schema).toEqual(
 // `type Query {

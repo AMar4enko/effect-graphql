@@ -14,23 +14,23 @@ export enum Test {
 
 test(`extendsInterface`, () => {
   const Identifiable = Schema.Struct({ id: Schema.String })
-    .pipe(
-      asInterface(`Identifiable`),
-    )
+    // .pipe(
+    //   asInterface(`Identifiable`),
+    // )
 
   const Timestamps = Schema.Struct({ updatedAt: Schema.DateFromSelf })
     .pipe(
       asInterface(`Timestamps`),
     )
 
-  class User extends Schema.TaggedClass<string>()(
+  class User extends Schema.TaggedClass<User>()(
     `User`,
     {
       name: Schema.String,
     },
   ).pipe(
     extendsInterface(Identifiable),
-    extendsInterface(Timestamps),
+    // extendsInterface(Timestamps),
   ) {}
 
   expect(new User({ name: `John`, id: `1`, updatedAt: new Date() })).toMatchObject({

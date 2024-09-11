@@ -1,10 +1,6 @@
-import { AST } from '@effect/schema'
-import { Context, Effect, pipe, Record as R, Runtime } from 'effect'
-import { GraphQLBoolean, GraphQLFieldConfig, GraphQLObjectType, GraphQLOutputType, GraphQLSchema, ThunkObjMap } from 'graphql'
+import { Effect, pipe, Record as R } from 'effect'
+import { GraphQLFieldConfig, GraphQLObjectType, GraphQLSchema, ThunkObjMap } from 'graphql'
 
-// import { getOperationMetadata } from '../annotation'
-import { Schema, TaggedRequestNewable } from '../schema.js'
-import { compileInputFields } from './input.js'
 import { compileOutputType } from './output.js'
 import { getResolverArgs, makeResolver } from './misc.js'
 import { TaggedRequestClass } from '@effect/schema/Schema'
@@ -15,8 +11,6 @@ export const compile = Effect.gen(function* () {
 
     const query: ThunkObjMap<GraphQLFieldConfig<any, any, any>> = {}
     const mutation: ThunkObjMap<GraphQLFieldConfig<any, any, any>> = {}
-
-    console.log(schema.definition.resolver)
 
     yield* pipe(
       R.toEntries(schema.definition.query || {}),
@@ -53,21 +47,13 @@ export const compile = Effect.gen(function* () {
     )
 
     return new GraphQLSchema({
-      types: [
-        // ...objects.values(),
-        // ...interfaces.values(),
-        // ...inputs.values(),
-      ],
-      // subscription: new GraphQLObjectType({
-      //   fields: {
-      //     a: {
-      //       s,
-      //     },
-      //   },
-      // }),
-      query: new GraphQLObjectType({
+      query: R.isEmptyRecord(query) ? undefined : new GraphQLObjectType({
         name: `Query`,
         fields: query,
+      }),
+      mutation: R.isEmptyRecord(mutation) ? undefined : new GraphQLObjectType({
+        name: `Mutation`,
+        fields: mutation,
       }),
     })
   })

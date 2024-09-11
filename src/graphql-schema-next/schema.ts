@@ -3,6 +3,7 @@ import {} from "effect/Effectable"
 import * as S from "@effect/schema"
 import { Invariant } from "effect/Types"
 import { TaggedRequest } from "@effect/schema/Schema"
+import { getIdentifierAnnotation } from "./misc"
 
 export const TypeId: unique symbol = Symbol.for(`effect-graphql/Schema`)
 export type TypeId = typeof TypeId
@@ -98,7 +99,12 @@ export const proto = {
 }
 
 export const make = (): Schema<Schema.Definition> => {
-  return Object.create(proto)
+  const o = Object.create(proto)
+  o.definition = Object.freeze({
+    fieldQuery: {}
+  })
+
+  return o;
 }
 
 export const withQueries = <Fields extends {[key in string]: TaggedRequest.Any }>(f: {[key in keyof Fields]: TaggedRequestNewable<Fields[key]>}) => 
@@ -166,7 +172,7 @@ export type ResolveFieldFunction = <
 
 export const resolveField: ResolveFieldFunction = (schema, requests) => (gqlSchema) => {  
 
-  const id = S.AST.getIdentifierAnnotation((schema as any).ast).pipe(Option.getOrThrowWith(() => new Error(`Schema ${schema} must have identifier annotation`)))
+  const id = getIdentifierAnnotation((schema as any).ast).pipe(Option.getOrThrowWith(() => new Error(`Schema ${schema} must have identifier annotation`)))
 
   const fieldQuery = {
     ...gqlSchema.definition.fieldQuery,

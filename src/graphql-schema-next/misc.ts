@@ -1,6 +1,6 @@
 import { dual } from 'effect/Function'
 import { AST, Schema } from '@effect/schema'
-import { Declaration, IndexSignature, PropertySignature as _PropertySignature, partial as _partial, PropertySignatureTransformation, Suspend, Transformation, TupleType, TypeLiteral, undefinedKeyword, Union, OptionalType } from '@effect/schema/AST'
+import { Declaration, IndexSignature, PropertySignature as _PropertySignature, partial as _partial, PropertySignatureTransformation, Suspend, Transformation, TupleType, TypeLiteral, undefinedKeyword, Union, OptionalType, IdentifierAnnotationId } from '@effect/schema/AST'
 import { isSchema, make } from '@effect/schema/Schema'
 import { identity, Option } from 'effect'
 import { createHash } from 'node:crypto'
@@ -105,3 +105,8 @@ export const deepPartial: {
   self: Schema.Schema<A, I, R>,
   options?: { readonly exact: true },
 ): DeepPartialSchema<typeof self, typeof options> => make(deepPartialAst(self.ast, options)))
+
+export const getIdentifierAnnotation = (s: AST.AST) => 
+  s._tag === `Transformation`
+    ? AST.getIdentifierAnnotation(s.to)
+    : AST.getIdentifierAnnotation(s)

@@ -1,7 +1,7 @@
 import { AST } from '@effect/schema'
 import { TypeAnnotationId } from '@effect/schema/AST'
 import { IntTypeId, TaggedRequestClass } from '@effect/schema/Schema'
-import { Effect, FiberRef, Match, Option, pipe, Record as R, RequestResolver, Runtime } from 'effect'
+import { Console, Effect, FiberRef, Match, Option, pipe, Record as R, RequestResolver, Runtime } from 'effect'
 import { Kind } from 'graphql'
 import { GraphQLBoolean, GraphQLEnumType, GraphQLEnumValueConfig, GraphQLFloat, GraphQLID, GraphQLInt, GraphQLScalarType, GraphQLString } from 'graphql'
 
@@ -131,7 +131,6 @@ export const compileScalar = Match.type<AST.AST>().pipe(
       const serialize = ast.transformation.encode
 
       const compile = Effect.gen(function* () {
-        console.log(ast)
         return new GraphQLScalarType({
           name: AST.getIdentifierAnnotation(ast).pipe(
             Option.getOrThrowWith(() => new Error(`Identifier missing ${ast}`)),
@@ -164,22 +163,29 @@ export const compileScalar = Match.type<AST.AST>().pipe(
 export const omitTag = (declarations: AST.PropertySignature[]) => declarations.filter((a) => a.name !== `_tag`)
 
 export const makeResolver = (Request: TaggedRequestNewable<any>, resolver: RequestResolver.RequestResolver<any, never>) => Effect.gen(function* () {
-  const runPromise = Runtime.runPromise(yield* Effect.runtime())
   const resolverWithContext = RequestResolver.contextFromEffect(resolver)
   return (source: any, args: any, context: any, info: any) => {
     /**
      * Operations get resolved without source
      */
     const req = source === undefined
-      ? new Request(args)
+      ? new Request(args, true)
       : new Request({
-        parent: source,
-        args,
-      })
+          parent: source,
+          args,
+        }, true)
 
-    const eff = Effect.request(resolverWithContext)(req)
+    const eff = Effect.request(resolverWithContext)(req).pipe(
+      Effect.zipLeft(
+        Effect.currentParentSpan.pipe(
+          Effect.andThen((parentSpan) => 
+            Console.log(parentSpan.spanId, info.path)
+          )
+        )
+      )
+    )
 
-    return runPromise(eff)
+    return context.runPromise(eff)
   }
 })
 
